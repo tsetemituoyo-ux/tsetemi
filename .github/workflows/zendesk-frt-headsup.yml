@@ -19,6 +19,13 @@ jobs:
         with:
           python-version: '3.12'
 
+      - name: Restore notification cache
+        uses: actions/cache@v4
+        with:
+          path: scripts/.frt_headsup_cache.json
+          key: frt-headsup-cache-${{ runner.os }}
+          restore-keys: frt-headsup-cache-
+
       - name: Install dependencies
         run: pip install requests
 

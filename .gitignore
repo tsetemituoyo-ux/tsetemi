@@ -1,0 +1,3 @@
+scripts/.frt_headsup_cache.json
+__pycache__/
+*.pyc

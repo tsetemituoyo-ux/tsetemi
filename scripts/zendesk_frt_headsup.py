@@ -111,14 +111,15 @@ def send_headsup(ticket: dict, assignee_name: str, manager_name: str | None) -> 
         return False
 
 
+CACHE_FILE = os.path.join(os.path.dirname(__file__), ".frt_headsup_cache.json")
+
+
 def get_processed_tickets_cache() -> set[int]:
-    """Load previously processed ticket IDs to avoid duplicate notifications."""
-    cache_file = "/tmp/frt_headsup_processed.json"
-    if os.path.exists(cache_file):
+    """Load previously processed ticket IDs to avoid duplicate notifications within 24 hours."""
+    if os.path.exists(CACHE_FILE):
         try:
-            with open(cache_file) as f:
+            with open(CACHE_FILE) as f:
                 data = json.load(f)
-                # Only keep tickets processed in the last 24 hours
                 cutoff = datetime.datetime.utcnow() - datetime.timedelta(hours=24)
                 cutoff_ts = cutoff.timestamp()
                 return {
@@ -130,21 +131,24 @@ def get_processed_tickets_cache() -> set[int]:
     return set()
 
 
-def save_processed_ticket(ticket_id: int, processed: set[int]) -> None:
-    """Save ticket ID to processed cache."""
-    cache_file = "/tmp/frt_headsup_processed.json"
+def save_processed_ticket(ticket_id: int) -> None:
+    """Save ticket ID to persistent cache with current timestamp."""
     try:
-        if os.path.exists(cache_file):
-            with open(cache_file) as f:
+        if os.path.exists(CACHE_FILE):
+            with open(CACHE_FILE) as f:
                 data = json.load(f)
         else:
             data = {}
     except (json.JSONDecodeError, IOError):
         data = {}
 
+    # Prune entries older than 24 hours to keep the file small
+    cutoff_ts = (datetime.datetime.utcnow() - datetime.timedelta(hours=24)).timestamp()
+    data = {k: v for k, v in data.items() if v > cutoff_ts}
+
     data[str(ticket_id)] = datetime.datetime.utcnow().timestamp()
 
-    with open(cache_file, "w") as f:
+    with open(CACHE_FILE, "w") as f:
         json.dump(data, f)
 
 
@@ -185,7 +189,7 @@ def main() -> None:
         # Send headsup
         if send_headsup(ticket, assignee_name, manager_name):
             print(f"  Ticket {ticket_id}: Headsup sent to {assignee_name}")
-            save_processed_ticket(ticket_id, processed)
+            save_processed_ticket(ticket_id)
             processed.add(ticket_id)
             sent_count += 1
         else:
