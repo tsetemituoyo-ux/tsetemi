@@ -1,0 +1,48 @@
+name: Slack Mention Tracker Refresh
+
+on:
+  schedule:
+    # Daily full refresh at 8 AM CET (7 AM UTC) — looks back 24 hours
+    - cron: '0 7 * * *'
+    # Hourly check Mon–Fri 9 AM–6 PM CET (8–17 UTC) — looks back 1 hour
+    - cron: '0 8-17 * * 1-5'
+  workflow_dispatch:
+    inputs:
+      hours_back:
+        description: 'Hours to look back (default: 1)'
+        required: false
+        default: '1'
+
+jobs:
+  refresh:
+    name: Refresh tracker
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install dependencies
+        run: pip install anthropic requests
+
+      - name: Determine look-back window
+        id: window
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "hours=${{ github.event.inputs.hours_back }}" >> "$GITHUB_OUTPUT"
+          elif [ "$(date -u +%H)" = "07" ]; then
+            # 7 AM UTC = 8 AM CET daily run → full 24-hour sweep
+            echo "hours=24" >> "$GITHUB_OUTPUT"
+          else
+            echo "hours=1" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Run refresh
+        env:
+          SLACK_BOT_TOKEN: ${{ secrets.SLACK_BOT_TOKEN }}
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+        run: python scripts/refresh_tracker.py --hours ${{ steps.window.outputs.hours }}
