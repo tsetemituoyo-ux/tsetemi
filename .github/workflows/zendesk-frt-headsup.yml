@@ -1,0 +1,32 @@
+name: Zendesk FRT Breach Headsup
+
+on:
+  schedule:
+    # Run every 15 minutes Mon-Fri 8 AM - 8 PM CET (7-19 UTC)
+    - cron: '*/15 7-19 * * 1-5'
+  workflow_dispatch:
+
+jobs:
+  notify:
+    name: Send FRT breach headsups
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install dependencies
+        run: pip install requests
+
+      - name: Run FRT breach notifier
+        env:
+          ZENDESK_SUBDOMAIN: ${{ vars.ZENDESK_SUBDOMAIN }}
+          ZENDESK_EMAIL: ${{ secrets.ZENDESK_EMAIL }}
+          ZENDESK_API_TOKEN: ${{ secrets.ZENDESK_API_TOKEN }}
+          HEADSUP_WEBHOOK_URL: ${{ secrets.HEADSUP_WEBHOOK_URL }}
+          ZENDESK_DIRECT_MANAGER_FIELD_ID: ${{ vars.ZENDESK_DIRECT_MANAGER_FIELD_ID }}
+        run: python scripts/zendesk_frt_headsup.py
